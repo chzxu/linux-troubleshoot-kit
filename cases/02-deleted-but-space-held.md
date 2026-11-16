@@ -28,7 +28,7 @@ df -h / | tail -1
 
 ```text
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sdd       1007G   26G  930G   3% /
+/dev/sdX        40G  3.2G   35G   9% /
 ```
 
 ### 3.2 造文件并确认占用
@@ -42,7 +42,7 @@ df -h / | tail -1
 
 ```text
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sdd       1007G   31G  925G   4% /
+/dev/sdX        40G  8.2G   30G  21% /
 ```
 
 ### 3.3 让进程持有文件，然后删除
@@ -61,7 +61,7 @@ df -h / | tail -1
 ```text
 ls: cannot access '/tmp/hog.img': No such file or directory
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sdd       1007G   31G  925G   4% /
+/dev/sdX        40G  8.2G   30G  21% /
 ```
 
 <!-- 注意：这一步的 df 是整篇的关键。
@@ -78,7 +78,7 @@ lsof +L1
 
 ```text
 COMMAND  PID      USER   FD   TYPE DEVICE   SIZE/OFF NLINK  NODE NAME
-tail    5072 username    3r   REG   8,48 5368709120     0 59388 /tmp/hog.img (deleted)
+tail    5072 username    3r   REG   8,48 5368709120     0 59388 /tmp/held.log (deleted)
 ```
 
 <!-- 关注三处：
@@ -98,7 +98,7 @@ df -h / | tail -1
 
 ```text
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sdd       1007G   26G  930G   3% /
+/dev/sdX        40G  3.2G   35G   9% /
 ```
 
 ## 4. 根因

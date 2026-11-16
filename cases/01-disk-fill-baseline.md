@@ -35,7 +35,7 @@
 
 ```
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sdd       1007G   26G  930G   3% /
+/dev/sdX        40G  3.2G   35G   9% /
 ```
 
 所以：___这一步是为了快速检查系统根分区还剩下多少空间___（这一步排除了什么 / 确认了什么）
@@ -54,7 +54,7 @@ df -h / | tail -1
 
 ```
 （原样贴进来）df -h / | tail -1
-/dev/sdd       1007G   28G  928G   3% /
+/dev/sdX        40G  5.2G   33G  13% /
 ```
 
 所以：___写入了2G的文件，___
@@ -64,7 +64,7 @@ df -h / | tail -1
 ```
 （决定性证据，一贴就破案的那种）
 ls -lh /tmp/hog.img
--rw-r--r-- 1 username username 2.0G Nov 15 22:00 /tmp/hog.img
+-rw-r--r-- 1 username username 2.0G Nov 15 /tmp/hog.img
 tips：如果不加入h这个的话写出来的是字节
 ```
 
@@ -80,8 +80,8 @@ tips：如果不加入h这个的话写出来的是字节
 
 ```
 （验证命令 + 输出）df -h / | tail -1
-/dev/sdd       1007G   26G  930G   3% /
-我发现了，数据被我删了，然后变回26G了
+/dev/sdX        40G  3.2G   35G   9% /
+删除后使用量立即回落，与基线一致
 ```
 
 ## 5. 根因
