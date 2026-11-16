@@ -1,0 +1,8 @@
+# 内部交接文档，不进公开仓库
+PROGRESS.md
+WRITING-STYLE.md
+
+# 临时/测试产物
+test_common.sh
+*.bak
+*.bak-*
