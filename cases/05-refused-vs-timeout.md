@@ -9,8 +9,8 @@
      先写我想确认什么，再写两个错误看起来有多像。
      影响要写"分不清会导致什么"，别写"观察查看的内容"。 -->
 
-- 现象：关于网页服务连不上，需要理解是因为什么才连不上
-- 发现方式：用 curl 打不同的地址，看报错文字和耗时
+- 现象：一个报什么、另一个报什么；或者一个秒回、一个卡 4 秒
+- 发现方式：用 curl 打两个地址，看报错文字和耗时
 - 影响：让用户无法使用服务，并且运维这边不清楚为啥连不上
 
 ## 2. 环境
@@ -28,7 +28,7 @@
 
 ```bash
 python3 -m http.server 8080 &
-curl -s -o /dev/null -w 'HTTP %{http_code} 用时 %{time_total}s\n' http://127.0.0.1:8080/
+curl -s -o /dev/null -w '连接 %{time_connect}s  总计 %{time_total}s  状态 %{http_code}\n' http://127.0.0.1:8080/
 ```
 
 输出：
@@ -38,6 +38,14 @@ Serving HTTP on 0.0.0.0 port 8080 (http://0.0.0.0:8080/) ...
 127.0.0.1 - - [16/Nov/2026 18:54:59] "GET / HTTP/1.1" 200 -
 HTTP 200 用时 0.029656s
 ```
+
+<!-- 待补：上面这版没带 time_connect，重跑一次换成新格式再贴。
+     输出里要能看出三件事：
+       ① 状态码 200 —— 业务层成功
+       ② 服务器自己打了一行日志 —— 请求真的到了
+       ③ 连接耗时 —— 拿它和 3.2 的 0 ms 对比
+
+     埋一个伏笔：③ 那条日志，等到 3.5 做防火墙实验时会消失。 -->
 
 ### 3.2 refused · 本机没人监听的端口
 
@@ -102,6 +110,7 @@ curl -sv --connect-timeout 4 http://192.0.2.1/
 输出：
 
 ```text
+（待补：会卡 4 秒，跑完原样粘进来）
 *   Trying 192.0.2.1:80...
 * ipv4 connect timeout after 4000ms, move on!
 * Failed to connect to 192.0.2.1 port 80 after 4000 ms: Timeout was reached
@@ -125,7 +134,7 @@ sudo iptables -I INPUT 1 -p tcp --dport 8080 -j DROP
 # 一个"明确拒绝"（结果应该是 refused）
 sudo iptables -I INPUT 1 -p tcp --dport 8081 -j REJECT --reject-with tcp-reset
 
-curl -sv --connect-timeout 4 http://127.0.0.1:8080/
+curl -sv --connect-timeout 3 http://127.0.0.1:8080/
 curl -sv --connect-timeout 3 http://127.0.0.1:8081/
 
 # 立刻清理，别把规则留在机器里
@@ -135,22 +144,17 @@ sudo iptables -D INPUT -p tcp --dport 8081 -j REJECT --reject-with tcp-reset
 
 输出：
 
-8080（被 DROP）：
-
 ```text
-*   Trying 127.0.0.1:8080...
+（待补）*   Trying 127.0.0.1:8080...
 * ipv4 connect timeout after 4000ms, move on!
 * Failed to connect to 127.0.0.1 port 8080 after 4000 ms: Timeout was reached
-* Closing connection
-```
+* Closing connection//这个是等了4秒才返回连接失败
 
-8081（被 REJECT）：
-
-```text
+curl -sv --connect-timeout 4 http://127.0.0.1:8081/
 *   Trying 127.0.0.1:8081...
 * connect to 127.0.0.1 port 8081 from 127.0.0.1 port 48632 failed: Connection refused
 * Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server
-* Closing connection
+* Closing connection//这个是明确拒绝连接的没有犹豫
 ```
 
 <!-- 这是整个案例的灵魂：
@@ -176,7 +180,7 @@ curl -s --connect-timeout 2 http://127.0.0.1:8081/
 输出：
 
 ```text
-listening on lo, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+（待补）listening on lo, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 21:19:11.579616 IP 127.0.0.1.33806 > 127.0.0.1.8081: Flags [S], seq 785172159, win 65495, options [mss 65495,sackOK,TS val 2492153497 ecr 0,nop,wscale 10], length 0
 21:19:11.579688 IP 127.0.0.1.8081 > 127.0.0.1.33806: Flags [R.], seq 0, ack 785172160, win 0, length 0
 ```
@@ -187,31 +191,38 @@ listening on lo, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 ### 3.7 清理与验证
 
 ```bash
+jobs
+sudo iptables -S | grep -E '8080|8081' || echo "规则已经清干净"
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/
 ```
 
 输出：
 
 ```text
+（待补）
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/
 127.0.0.1 - - [16/Nov/2026 21:21:38] "GET / HTTP/1.1" 200 -
 200
 ```
 
 ## 4. 根因
 
-那个 `Flags [R.]` 是**目标机器的内核**发出来的：它收到我的 SYN，查了一下 8081 上没有程序在监听，
-就直接回一个 RST 让我死心。这次走的是 loopback，所以那台"目标机器"就是我自己；换成跨主机，
-就是对面那台机器的内核。
+<!-- 分三层写，一层比一层深：
 
-从 SYN（`579616`）到 RST（`579688`）只隔 **72 微秒**。这个数字说明的事情只有一件：
-**有个包真的回来了**。它没走物理网络所以快，但重点不是快，是"有回音"。
-
-所以一句话：
-
-- **refused 是"等到了一个明确的否定"**
-- **timeout 是"什么都没等到"**
-
-排查的时候这就是分界线：前者去查服务，后者去查网络。
+     第一层（应用层）：两个错误文字不同，curl 分别报
+       "Connection refused" / "Timeout was reached"
+       一个是内核 Errno 111（ECONNREFUSED），一个是自己等到超时
+    
+     第二层（传输层）：refused 的背后是一个 RST 包
+       对方收到 SYN，没有监听 → 内核回 RST → 你的内核把它变成 ECONNREFUSED
+       timeout 的背后是什么都没有：SYN 发出去，重传几次，直到 --connect-timeout 到点
+    
+     第三层（网络层）：为什么"什么都没有"
+       DROP 把包吞了 / 路由不通 / 对端关机 / 中间设备丢弃
+       这一层是"没有证据"的一层 —— 所以排查只能从外到内逐跳逼近
+    
+     最后落到一句人话：refused 是对方在跟你说话，timeout 是对方不理你。
+     会说话的好办，不理你的才要命。 -->
 
 ## 5. 预防
 
@@ -248,8 +259,22 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/
 
 2. `iptables` 的 DROP 和 REJECT，线上该选哪个？（提示：一个泄露信息，一个坑死排查的人）
 
+   | 场景                | 选哪个             | 为什么                                                       |
+   | ------------------- | ------------------ | ------------------------------------------------------------ |
+   | **公网入口**        | DROP（静默）       | 不告诉扫描器「这个端口存在」                                 |
+   | **内网 / 受信网段** | REJECT `tcp-reset` | 立刻给出确定信号，双方都不用耗在重传上                       |
+   | **云安全组**        | 你没得选           | 云上「拒绝」基本就是静默丢弃 → 所以 **timeout 在云上更常见** |
+
 3. 服务监听 `0.0.0.0:8080` 和监听 `127.0.0.1:8080`，从别的机器连你，现象一样吗？分别是哪种错误？
+
+   | 服务绑在哪       | 从别的机器连你的 eth0 IP | 现象                                                      |
+   | ---------------- | ------------------------ | --------------------------------------------------------- |
+   | `0.0.0.0:8080`   | 能到                     | 防火墙放行 → `200`；拦了 → `timeout`                      |
+   | `127.0.0.1:8080` | **到不了**               | **`refused`** —— 你的内核在 eth0 上找不到这个监听，回 RST |
 
 4. K8s 里一个 Pod 连不上 Service，用今天的判据，你怎么三步定位？
 
-   待续：W5 学完 K8s 回来补。
+我还没学k8s，需要你帮我整改
+我认为按照今天的判据第一步是看Pod的内核，看看是refused还是timeout
+第二步就按照refused去排查
+第三步就是按照timeout去排查

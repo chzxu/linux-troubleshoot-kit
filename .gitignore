@@ -6,3 +6,7 @@ WRITING-STYLE.md
 test_common.sh
 *.bak
 *.bak-*
+
+# 生成的巡检报告：含真实挂载点/磁盘大小/内核版本，不提交
+rep.md
+*.report.md

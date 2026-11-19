@@ -3,16 +3,16 @@
 # 约定: REPORT为空=输出到屏幕上；非空=写入该文件里面
 
 _out(){
-    if [ -n "$REPORT" ]; then
-        printf '%s\n' "$1" >> "$REPORT"
+    if [ -n "${REPORT:-}" ]; then
+        printf "%s\n" "$1" >> "$REPORT"
     else
-        printf '%s\n' "$1"
+        printf "%s\n" "$1"
     fi
 }
 
 section(){
     _out "";
-    _out "## $1";
+    _out "==================== $1 ===================="
     _out "";
 }
 
@@ -25,6 +25,6 @@ code(){
 }
 
 _emit() { printf '%b %s\n' "$1" "$2" >&2; }
-ok() { _emit "✅" "$1"; } 
+ok() { _emit "✅" "$1"; }
 warn() { _emit "⚠️" "$1"; }
 fail() { _emit "❌" "$1"; }
